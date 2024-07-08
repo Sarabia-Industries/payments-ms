@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { Request, Response } from 'express';
 import Stripe from 'stripe';
 
@@ -43,34 +43,33 @@ export class PaymentsService {
   success() {}
   cancel() {}
   async paymentWebhook(request: Request, response: Response) {
-    const signature = request.headers['stripe-signature'];
-    const endpointSecret = envs.stripeEndpointSecret;
-
-    let event: Stripe.Event;
-
     try {
+      const signature = request.headers['stripe-signature'];
+      const endpointSecret = envs.stripeEndpointSecret;
+
+      let event: Stripe.Event;
       event = this.stripe.webhooks.constructEvent(
         request['rawBody'],
         signature,
         endpointSecret,
       );
+
+      switch (event.type) {
+        case 'charge.succeeded':
+          const chargeSucceeded = event.data.object;
+
+          console.log(chargeSucceeded.metadata);
+
+          break;
+        default:
+          console.log(`Unhandled event type ${event.type}`);
+          break;
+      }
+
+      return response.status(200).json({ signature });
     } catch (error) {
-      response.status(400).send(`Webhook Error: ${error.message}`);
+      response.status(HttpStatus.BAD_REQUEST);
       return;
     }
-
-    switch (event.type) {
-      case 'charge.succeeded':
-        const chargeSucceeded = event.data.object;
-
-        console.log(chargeSucceeded.metadata);
-
-        break;
-      default:
-        console.log(`Unhandled event type ${event.type}`);
-        break;
-    }
-
-    return response.status(200).json({ signature });
   }
 }
