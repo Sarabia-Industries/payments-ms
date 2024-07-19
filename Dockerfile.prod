@@ -1,0 +1,39 @@
+FROM node:21-alpine3.19 AS deps
+
+WORKDIR /usr/src/app
+
+COPY package.json yarn.lock ./
+
+RUN yarn install
+
+
+
+FROM node:21-alpine3.19 AS build
+
+WORKDIR /usr/src/app
+
+COPY --from=deps /usr/src/app/node_modules ./node_modules
+
+COPY . .
+
+RUN yarn build
+
+RUN yarn install --frozen-lockfile && yarn cache clean --force
+
+
+
+FROM node:21-alpine3.19 AS prod
+
+WORKDIR /usr/src/app
+
+COPY --from=build /usr/src/app/node_modules ./node_modules
+
+COPY --from=build /usr/src/app/dist ./dist
+
+ENV NODE_ENV=production
+
+USER node
+
+EXPOSE 3000
+
+CMD [ "node", "dist/src/main.js" ]
